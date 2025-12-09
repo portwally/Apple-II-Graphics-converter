@@ -29,6 +29,8 @@ enum AppleIIImageType: Equatable {
     case DHGR
     case HGR
     case IFF(width: Int, height: Int, colors: String)
+    case DEGAS(resolution: String, colors: Int)
+    case C64(format: String)
     case Unknown
     
     var resolution: (width: Int, height: Int) {
@@ -37,6 +39,14 @@ enum AppleIIImageType: Equatable {
         case .DHGR: return (560, 192)
         case .HGR: return (280, 192)
         case .IFF(let width, let height, _): return (width, height)
+        case .DEGAS(let res, _):
+            switch res {
+            case "Low": return (320, 200)
+            case "Medium": return (640, 200)
+            case "High": return (640, 400)
+            default: return (0, 0)
+            }
+        case .C64: return (320, 200)
         case .Unknown: return (0, 0)
         }
     }
@@ -47,6 +57,8 @@ enum AppleIIImageType: Equatable {
         case .DHGR: return "DHGR"
         case .HGR: return "HGR"
         case .IFF(_, _, let colors): return "IFF (\(colors))"
+        case .DEGAS(let res, let colors): return "Degas (\(res), \(colors) colors)"
+        case .C64(let format): return "C64 (\(format))"
         case .Unknown: return "Unknown"
         }
     }
@@ -180,9 +192,9 @@ struct ContentView: View {
                         Image(systemName: "photo.stack")
                             .font(.system(size: 50))
                             .foregroundColor(.secondary)
-                        Text("Apple II Graphics Converter")
+                        Text("Retro Graphics Converter")
                             .font(.headline)
-                        Text("Supports SHR, HGR, DHGR, and Amiga IFF formats.")
+                        Text("Supports Apple II (SHR/HGR/DHGR), Amiga IFF, Atari ST Degas, and C64 (Koala/Art Studio).")
                             .multilineTextAlignment(.center)
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -605,6 +617,32 @@ class SHRDecoder {
             }
         }
         
+        // Check for C64 formats (by exact file size)
+        switch size {
+        case 10003: // Koala Painter
+            return decodeC64Koala(data: data)
+        case 10018: // Art Studio variant
+            return decodeC64ArtStudio(data: data)
+        case 9009: // Art Studio HIRES or similar
+            return decodeC64Hires(data: data)
+        default:
+            break
+        }
+        
+        // Check for Degas format (.PI1, .PI2, .PI3)
+        if size >= 34 {
+            let resolutionWord = readBigEndianUInt16(data: data, offset: 0)
+            
+            let isDegas = (resolutionWord <= 2) && (
+                size == 32034 ||  // PI1: Low res
+                size == 32066     // PI2/PI3: Medium/High res
+            )
+            
+            if isDegas {
+                return decodeDegas(data: data)
+            }
+        }
+        
         // Then check Apple II formats by size
         let type: AppleIIImageType
         let image: CGImage?
@@ -628,6 +666,346 @@ class SHRDecoder {
         }
         
         return (image, type)
+    }
+    
+    // C64 HIRES Format - 9009 bytes (Art Studio variant or similar)
+    // Format: 2 bytes load address + 8000 bytes bitmap + 1000 bytes screen RAM + 7 bytes extra
+    static func decodeC64Hires(data: Data) -> (image: CGImage?, type: AppleIIImageType) {
+        guard data.count == 9009 else {
+            return (nil, .Unknown)
+        }
+        
+        let width = 320
+        let height = 200
+        var rgbaBuffer = [UInt8](repeating: 0, count: width * height * 4)
+        
+        let bitmapOffset = 2
+        let screenRAMOffset = 8002
+        
+        // Decode as HIRES (1 bit per pixel)
+        for cellY in 0..<25 {
+            for cellX in 0..<40 {
+                let cellIndex = cellY * 40 + cellX
+                
+                // Screen RAM contains foreground (low nybble) and background (high nybble) colors
+                let screenByte = data[screenRAMOffset + cellIndex]
+                let bgColor = Int((screenByte >> 4) & 0x0F)
+                let fgColor = Int(screenByte & 0x0F)
+                
+                for row in 0..<8 {
+                    let bitmapByteOffset = bitmapOffset + (cellIndex * 8) + row
+                    if bitmapByteOffset >= data.count { continue }
+                    
+                    let bitmapByte = data[bitmapByteOffset]
+                    let y = cellY * 8 + row
+                    
+                    // Each bit is one pixel (320 pixels wide)
+                    for bit in 0..<8 {
+                        let x = cellX * 8 + bit
+                        let bitVal = (bitmapByte >> (7 - bit)) & 1
+                        let colorIndex = (bitVal == 0) ? fgColor : bgColor  // Inverted: 0 = foreground
+                        
+                        let rgb = c64Palette[colorIndex]
+                        let bufferIdx = (y * width + x) * 4
+                        
+                        if bufferIdx + 3 < rgbaBuffer.count {
+                            rgbaBuffer[bufferIdx] = rgb.r
+                            rgbaBuffer[bufferIdx + 1] = rgb.g
+                            rgbaBuffer[bufferIdx + 2] = rgb.b
+                            rgbaBuffer[bufferIdx + 3] = 255
+                        }
+                    }
+                }
+            }
+        }
+        
+        guard let cgImage = createCGImage(from: rgbaBuffer, width: width, height: height) else {
+            return (nil, .Unknown)
+        }
+        
+        return (cgImage, .C64(format: "C64 HIRES"))
+    }
+    
+    // --- Commodore 64 Decoders ---
+    
+    // C64 Color Palette (16 colors)
+    static let c64Palette: [(r: UInt8, g: UInt8, b: UInt8)] = [
+        (0x00, 0x00, 0x00),  // 0: Black
+        (0xFF, 0xFF, 0xFF),  // 1: White
+        (0x68, 0x37, 0x2B),  // 2: Red
+        (0x70, 0xA4, 0xB2),  // 3: Cyan
+        (0x6F, 0x3D, 0x86),  // 4: Purple
+        (0x58, 0x8D, 0x43),  // 5: Green
+        (0x35, 0x28, 0x79),  // 6: Blue
+        (0xB8, 0xC7, 0x6F),  // 7: Yellow
+        (0x6F, 0x4F, 0x25),  // 8: Orange
+        (0x43, 0x39, 0x00),  // 9: Brown
+        (0x9A, 0x67, 0x59),  // 10: Light Red
+        (0x44, 0x44, 0x44),  // 11: Dark Grey
+        (0x6C, 0x6C, 0x6C),  // 12: Grey
+        (0x9A, 0xD2, 0x84),  // 13: Light Green
+        (0x6C, 0x5E, 0xB5),  // 14: Light Blue
+        (0x95, 0x95, 0x95)   // 15: Light Grey
+    ]
+    
+    // Koala Painter (.KOA, .KLA) - 10003 bytes
+    // Format: 2 bytes load address + 8000 bytes bitmap + 1000 bytes screen RAM + 1000 bytes color RAM + 1 byte background
+    static func decodeC64Koala(data: Data) -> (image: CGImage?, type: AppleIIImageType) {
+        guard data.count == 10003 else {
+            return (nil, .Unknown)
+        }
+        
+        let width = 320
+        let height = 200
+        var rgbaBuffer = [UInt8](repeating: 0, count: width * height * 4)
+        
+        // Koala format offsets
+        let bitmapOffset = 2           // Skip load address
+        let screenRAMOffset = 8002     // Bitmap + load address
+        let colorRAMOffset = 9002      // + screen RAM
+        let backgroundOffset = 10002   // + color RAM
+        
+        let backgroundColor = data[backgroundOffset] & 0x0F
+        
+        // Decode bitmap (160x200 cells, each 4x8 pixels)
+        for cellY in 0..<25 {  // 25 rows of cells
+            for cellX in 0..<40 {  // 40 columns of cells
+                let cellIndex = cellY * 40 + cellX
+                
+                // Get color information for this cell
+                let screenByte = data[screenRAMOffset + cellIndex]
+                let colorByte = data[colorRAMOffset + cellIndex]
+                
+                // Extract the 4 colors for this cell
+                let color0 = backgroundColor  // Background (00)
+                let color1 = (screenByte >> 4) & 0x0F  // Upper nybble (01)
+                let color2 = screenByte & 0x0F         // Lower nybble (10)
+                let color3 = colorByte & 0x0F          // Color RAM (11)
+                
+                let colors = [color0, color1, color2, color3]
+                
+                // Decode 8 rows of 4 pixels each
+                for row in 0..<8 {
+                    let bitmapByteOffset = bitmapOffset + (cellIndex * 8) + row
+                    if bitmapByteOffset >= data.count { continue }
+                    
+                    let bitmapByte = data[bitmapByteOffset]
+                    let y = cellY * 8 + row
+                    
+                    // Decode 4 pixels (2 bits per pixel)
+                    for pixelPair in 0..<4 {
+                        let x = cellX * 8 + (pixelPair * 2)
+                        let bitShift = 6 - (pixelPair * 2)
+                        let colorIndex = Int((bitmapByte >> bitShift) & 0x03)
+                        
+                        let c64Color = Int(colors[colorIndex])
+                        let rgb = c64Palette[c64Color]
+                        
+                        // Each C64 pixel is 2 screen pixels wide (multicolor mode)
+                        for dx in 0..<2 {
+                            let bufferIdx = (y * width + x + dx) * 4
+                            if bufferIdx + 3 < rgbaBuffer.count {
+                                rgbaBuffer[bufferIdx] = rgb.r
+                                rgbaBuffer[bufferIdx + 1] = rgb.g
+                                rgbaBuffer[bufferIdx + 2] = rgb.b
+                                rgbaBuffer[bufferIdx + 3] = 255
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        guard let cgImage = createCGImage(from: rgbaBuffer, width: width, height: height) else {
+            return (nil, .Unknown)
+        }
+        
+        return (cgImage, .C64(format: "Koala Painter"))
+    }
+    
+    // Advanced Art Studio (.ART, .OCP) - 10018 bytes
+    // Note: Many 10018 byte files are actually Koala format with 15 extra bytes
+    // This decoder treats them as standard Koala layout
+    static func decodeC64ArtStudio(data: Data) -> (image: CGImage?, type: AppleIIImageType) {
+        guard data.count == 10018 else {
+            return (nil, .Unknown)
+        }
+        
+        let width = 320
+        let height = 200
+        var rgbaBuffer = [UInt8](repeating: 0, count: width * height * 4)
+        
+        // Standard Koala offsets (10018 byte variant)
+        let bitmapOffset = 2
+        let screenRAMOffset = 8002
+        let colorRAMOffset = 9002
+        let backgroundOffset = 10002
+        
+        let backgroundColor = data[backgroundOffset] & 0x0F
+        
+        // Decode using standard Koala algorithm
+        for cellY in 0..<25 {
+            for cellX in 0..<40 {
+                let cellIndex = cellY * 40 + cellX
+                
+                let screenByte = data[screenRAMOffset + cellIndex]
+                let colorByte = data[colorRAMOffset + cellIndex]
+                
+                let color0 = backgroundColor
+                let color1 = (screenByte >> 4) & 0x0F
+                let color2 = screenByte & 0x0F
+                let color3 = colorByte & 0x0F
+                
+                let colors = [color0, color1, color2, color3]
+                
+                for row in 0..<8 {
+                    let bitmapByteOffset = bitmapOffset + (cellIndex * 8) + row
+                    if bitmapByteOffset >= data.count { continue }
+                    
+                    let bitmapByte = data[bitmapByteOffset]
+                    let y = cellY * 8 + row
+                    
+                    for pixelPair in 0..<4 {
+                        let x = cellX * 8 + (pixelPair * 2)
+                        let bitShift = 6 - (pixelPair * 2)
+                        let colorIndex = Int((bitmapByte >> bitShift) & 0x03)
+                        
+                        let c64Color = Int(colors[colorIndex])
+                        let rgb = c64Palette[c64Color]
+                        
+                        for dx in 0..<2 {
+                            let bufferIdx = (y * width + x + dx) * 4
+                            if bufferIdx + 3 < rgbaBuffer.count {
+                                rgbaBuffer[bufferIdx] = rgb.r
+                                rgbaBuffer[bufferIdx + 1] = rgb.g
+                                rgbaBuffer[bufferIdx + 2] = rgb.b
+                                rgbaBuffer[bufferIdx + 3] = 255
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        guard let cgImage = createCGImage(from: rgbaBuffer, width: width, height: height) else {
+            return (nil, .Unknown)
+        }
+        
+        return (cgImage, .C64(format: "C64 Multicolor (10018 bytes)"))
+    }
+    
+    // --- Atari ST Degas Decoder (.PI1, .PI2, .PI3) ---
+    static func decodeDegas(data: Data) -> (image: CGImage?, type: AppleIIImageType) {
+        guard data.count >= 34 else {
+            return (nil, .Unknown)
+        }
+        
+        // Read resolution mode (0 = low, 1 = medium, 2 = high)
+        let resolutionMode = Int(readBigEndianUInt16(data: data, offset: 0))
+        
+        let width: Int
+        let height: Int
+        let numPlanes: Int
+        let numColors: Int
+        let resolutionName: String
+        
+        switch resolutionMode {
+        case 0: // Low res: 320x200, 16 colors (4 bitplanes)
+            width = 320
+            height = 200
+            numPlanes = 4
+            numColors = 16
+            resolutionName = "Low"
+            
+        case 1: // Medium res: 640x200, 4 colors (2 bitplanes)
+            width = 640
+            height = 200
+            numPlanes = 2
+            numColors = 4
+            resolutionName = "Medium"
+            
+        case 2: // High res: 640x400, 2 colors (1 bitplane, monochrome)
+            width = 640
+            height = 400
+            numPlanes = 1
+            numColors = 2
+            resolutionName = "High"
+            
+        default:
+            return (nil, .Unknown)
+        }
+        
+        // Read palette (16 ST color words starting at offset 2)
+        var palette: [(r: UInt8, g: UInt8, b: UInt8)] = []
+        for i in 0..<16 {
+            let colorWord = readBigEndianUInt16(data: data, offset: 2 + (i * 2))
+            
+            // Atari ST color format: 0x0RGB (4 bits per channel, 0-7 range)
+            let r4 = (colorWord >> 8) & 0x07
+            let g4 = (colorWord >> 4) & 0x07
+            let b4 = colorWord & 0x07
+            
+            // Scale from 0-7 to 0-255
+            let r = UInt8((r4 * 255) / 7)
+            let g = UInt8((g4 * 255) / 7)
+            let b = UInt8((b4 * 255) / 7)
+            
+            palette.append((r, g, b))
+        }
+        
+        // Image data starts at offset 34
+        let imageDataOffset = 34
+        var rgbaBuffer = [UInt8](repeating: 0, count: width * height * 4)
+        
+        // Degas uses interleaved bitplanes per 16-pixel chunk (word)
+        let wordsPerLine = width / 16
+        let bytesPerLine = wordsPerLine * numPlanes * 2
+        
+        for y in 0..<height {
+            let lineOffset = imageDataOffset + (y * bytesPerLine)
+            
+            for wordIdx in 0..<wordsPerLine {
+                // Read all bitplanes for this 16-pixel word
+                var planeWords: [UInt16] = []
+                for plane in 0..<numPlanes {
+                    let offset = lineOffset + (wordIdx * numPlanes * 2) + (plane * 2)
+                    if offset + 1 < data.count {
+                        planeWords.append(readBigEndianUInt16(data: data, offset: offset))
+                    } else {
+                        planeWords.append(0)
+                    }
+                }
+                
+                // Decode 16 pixels from the bitplane words
+                for bit in 0..<16 {
+                    let x = wordIdx * 16 + bit
+                    if x >= width { break }
+                    
+                    let bitPos = 15 - bit
+                    var colorIndex = 0
+                    
+                    // Build color index from bitplanes
+                    for plane in 0..<numPlanes {
+                        let bitVal = (planeWords[plane] >> bitPos) & 1
+                        colorIndex |= Int(bitVal) << plane
+                    }
+                    
+                    let color = palette[colorIndex]
+                    let bufferIdx = (y * width + x) * 4
+                    
+                    rgbaBuffer[bufferIdx] = color.r
+                    rgbaBuffer[bufferIdx + 1] = color.g
+                    rgbaBuffer[bufferIdx + 2] = color.b
+                    rgbaBuffer[bufferIdx + 3] = 255
+                }
+            }
+        }
+        
+        guard let cgImage = createCGImage(from: rgbaBuffer, width: width, height: height) else {
+            return (nil, .Unknown)
+        }
+        
+        return (cgImage, .DEGAS(resolution: resolutionName, colors: numColors))
     }
     
     // --- IFF/ILBM Decoder (Amiga Format) ---
