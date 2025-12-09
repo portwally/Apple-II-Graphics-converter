@@ -3,6 +3,21 @@ In the end I decided to code one myself in Swift. It started with SHR uncompress
 Newly added are now HGR and DHGR conversion and output formats like png, jpg, tiff, gif and heic.
 Added graphic formats for Amiga, Atari ST and C64.
 
+🎨 Supported formats:
+
+Apple II: SHR (Standard + 3200 Colour), HGR, DHGR
+Amiga: IFF/ILBM (Indexed Colour + 24-bit RGB with LSB-first)
+Atari ST: Degas PI1/PI2/PI3 (Low/Medium/High Res)
+C64: Koala Painter
+
+Features:
+
+📁 Image browser with thumbnails
+🗂️ Folder support (drag & drop + open)
+💾 Batch export (PNG, JPEG, TIFF, GIF, HEIC)
+⚡ Recursive scanning of subfolders
+🎯 Export single image or all images
+
 NEW version 2 now with image browser
 
 <img width="1012" height="740" alt="Bildschirmfoto 2025-12-09 um 11 37 11" src="https://github.com/user-attachments/assets/e13ae4d8-4699-440c-9d6a-d15364f033c8" />
