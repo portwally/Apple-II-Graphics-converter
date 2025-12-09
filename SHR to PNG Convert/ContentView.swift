@@ -34,6 +34,8 @@ enum AppleIIImageType: Equatable {
     case ZXSpectrum
     case AmstradCPC(mode: Int, colors: Int)
     case PCX(width: Int, height: Int, bitsPerPixel: Int)
+    case BMP(width: Int, height: Int, bitsPerPixel: Int)
+    case MacPaint
     case Unknown
     
     var resolution: (width: Int, height: Int) {
@@ -59,6 +61,8 @@ enum AppleIIImageType: Equatable {
             default: return (0, 0)
             }
         case .PCX(let width, let height, _): return (width, height)
+        case .BMP(let width, let height, _): return (width, height)
+        case .MacPaint: return (576, 720)
         case .Unknown: return (0, 0)
         }
     }
@@ -74,6 +78,8 @@ enum AppleIIImageType: Equatable {
         case .ZXSpectrum: return "ZX Spectrum"
         case .AmstradCPC(let mode, let colors): return "Amstrad CPC (Mode \(mode), \(colors) colors)"
         case .PCX(let width, let height, let bpp): return "PCX (\(width)x\(height), \(bpp)-bit)"
+        case .BMP(let width, let height, let bpp): return "BMP (\(width)x\(height), \(bpp)-bit)"
+        case .MacPaint: return "MacPaint (576x720, 1-bit)"
         case .Unknown: return "Unknown"
         }
     }
@@ -115,6 +121,7 @@ struct ContentView: View {
     @State private var isProcessing = false
     @State private var progressString = ""
     @State private var showBrowser = false
+    @State private var upscaleFactor: Int = 1 // 1 = no upscaling, 2/4/8 = upscale
     
     var body: some View {
         HSplitView {
@@ -209,7 +216,7 @@ struct ContentView: View {
                             .foregroundColor(.secondary)
                         Text("Retro Graphics Converter")
                             .font(.headline)
-                        Text("Supports Apple II, Amiga IFF, Atari ST, C64, ZX Spectrum, Amstrad CPC, and PCX.")
+                        Text("Supports Apple II, Amiga IFF, Atari ST, C64, ZX Spectrum, Amstrad CPC, PCX, BMP, and MacPaint.")
                             .multilineTextAlignment(.center)
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -262,6 +269,14 @@ struct ContentView: View {
                     .disabled(imageItems.isEmpty)
                     
                     Spacer()
+                    
+                    Picker("Upscale:", selection: $upscaleFactor) {
+                        Text("1x (Original)").tag(1)
+                        Text("2x").tag(2)
+                        Text("4x").tag(4)
+                        Text("8x").tag(8)
+                    }
+                    .frame(width: 150)
                     
                     Picker("Export As:", selection: $selectedExportFormat) {
                         ForEach(ExportFormat.allCases, id: \.self) { format in
@@ -437,7 +452,7 @@ struct ContentView: View {
                 }
                 
                 guard let data = try? Data(contentsOf: url) else { continue }
-                let result = SHRDecoder.decode(data: data)
+                let result = SHRDecoder.decode(data: data, filename: url.lastPathComponent)
                 
                 if let cgImage = result.image, result.type != .Unknown {
                     let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: result.type.resolution.width, height: result.type.resolution.height))
@@ -529,7 +544,16 @@ struct ContentView: View {
     }
     
     func saveImage(image: NSImage, to outputURL: URL, format: ExportFormat) -> Bool {
-        guard let tiffData = image.tiffRepresentation,
+        // Apply upscaling if factor > 1
+        var finalImage = image
+        if upscaleFactor > 1 {
+            if let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+               let upscaled = SHRDecoder.upscaleCGImage(cgImage, factor: upscaleFactor) {
+                finalImage = NSImage(cgImage: upscaled, size: NSSize(width: upscaled.width, height: upscaled.height))
+            }
+        }
+        
+        guard let tiffData = finalImage.tiffRepresentation,
               let bitmap = NSBitmapImageRep(data: tiffData) else {
             return false
         }
@@ -546,7 +570,7 @@ struct ContentView: View {
         case .gif:
             outputData = bitmap.representation(using: .gif, properties: [.ditherTransparency: true])
         case .heic:
-            guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
+            guard let cgImage = finalImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
             outputData = HEICConverter.convert(cgImage: cgImage)
         }
         
@@ -621,8 +645,16 @@ class HEICConverter {
 
 class SHRDecoder {
     
-    static func decode(data: Data) -> (image: CGImage?, type: AppleIIImageType) {
+    static func decode(data: Data, filename: String? = nil) -> (image: CGImage?, type: AppleIIImageType) {
         let size = data.count
+        
+        // Use filename extension as a hint if available
+        let fileExtension = filename?.split(separator: ".").last?.lowercased() ?? ""
+        
+        // Check for BMP format (starts with "BM")
+        if size >= 14 && data[0] == 0x42 && data[1] == 0x4D {
+            return decodeBMP(data: data)
+        }
         
         // Check for PCX format first (has magic byte 0x0A)
         if size >= 128 && data[0] == 0x0A {
@@ -647,10 +679,55 @@ class SHRDecoder {
             return decodeC64Hires(data: data)
         case 6912: // ZX Spectrum SCR
             return decodeZXSpectrum(data: data)
+        case 53248: // MacPaint (512 byte header + 51840 bytes image data)
+            return decodeMacPaint(data: data)
         case 16384: // Could be Amstrad CPC or Apple II DHGR
-            // Try to detect which format by checking for CPC screen mode byte
-            // CPC files often have a mode indicator or specific patterns
-            return decodeAmstradCPC(data: data)
+            // Use filename as hint if available
+            if fileExtension == "scr" {
+                // .SCR is commonly used for CPC screens
+                return decodeAmstradCPC(data: data)
+            } else if fileExtension == "2mg" || fileExtension == "po" || fileExtension == "dsk" {
+                // Apple II disk image extensions
+                return (decodeDHGR(data: data), .DHGR)
+            }
+            
+            // No clear filename hint, use heuristics
+            // CPC has distinctive patterns (interleaved scanlines, specific byte patterns)
+            // DHGR is more uniform memory layout
+            
+            var cpcScore = 0
+            var dhgrScore = 0
+            
+            // CPC typically has more varied data in the first few blocks
+            // DHGR has more sequential patterns
+            for blockIdx in 0..<8 {
+                let blockStart = blockIdx * 2048
+                if blockStart + 100 < data.count {
+                    let blockData = data[blockStart..<(blockStart + 100)]
+                    let uniqueBytes = Set(blockData).count
+                    
+                    // CPC tends to have more varied bytes per block
+                    if uniqueBytes > 50 {
+                        cpcScore += 1
+                    } else {
+                        dhgrScore += 1
+                    }
+                }
+            }
+            
+            // If mostly zeros or very uniform, probably DHGR
+            let firstKB = data.prefix(1024)
+            let zeroCount = firstKB.filter { $0 == 0 }.count
+            if zeroCount > 512 {
+                dhgrScore += 3 // Strong indicator for DHGR (often starts with zeros)
+            }
+            
+            // Default to DHGR if unclear (more common)
+            if cpcScore > dhgrScore + 2 {
+                return decodeAmstradCPC(data: data)
+            } else {
+                return (decodeDHGR(data: data), .DHGR)
+            }
         default:
             break
         }
@@ -696,6 +773,248 @@ class SHRDecoder {
     }
     
     // --- Risk EGA Format Decoder (32KB, 320x200, chunky 4-bit) ---
+    
+    // --- MacPaint Decoder (Classic Macintosh format, 576x720, 1-bit) ---
+    
+    static func decodeMacPaint(data: Data) -> (image: CGImage?, type: AppleIIImageType) {
+        // MacPaint format: 512 byte header + compressed image data
+        // Image is 576x720 pixels (1 bit per pixel)
+        // Data is compressed using PackBits (Apple's RLE)
+        
+        guard data.count >= 53248 else { // Typical size
+            return (nil, .Unknown)
+        }
+        
+        let width = 576
+        let height = 720
+        let bytesPerRow = 72 // 576 pixels / 8 bits per byte
+        
+        // Skip 512-byte header, start decompressing from byte 512
+        var compressed = Array(data[512...])
+        
+        // Decompress using PackBits
+        var decompressed: [UInt8] = []
+        var offset = 0
+        
+        while offset < compressed.count && decompressed.count < (bytesPerRow * height) {
+            let byte = compressed[offset]
+            offset += 1
+            
+            if byte >= 128 {
+                // RLE run: repeat next byte (257 - byte) times
+                let count = 257 - Int(byte)
+                if offset < compressed.count {
+                    let value = compressed[offset]
+                    offset += 1
+                    for _ in 0..<count {
+                        decompressed.append(value)
+                    }
+                }
+            } else {
+                // Literal run: copy next (byte + 1) bytes
+                let count = Int(byte) + 1
+                for _ in 0..<count {
+                    if offset < compressed.count {
+                        decompressed.append(compressed[offset])
+                        offset += 1
+                    }
+                }
+            }
+        }
+        
+        // Convert 1-bit bitmap to RGBA
+        var rgbaBuffer = [UInt8](repeating: 0, count: width * height * 4)
+        
+        for y in 0..<height {
+            for x in 0..<width {
+                let byteIndex = y * bytesPerRow + (x / 8)
+                
+                if byteIndex < decompressed.count {
+                    let byte = decompressed[byteIndex]
+                    let bitIndex = 7 - (x % 8)
+                    let bit = (byte >> bitIndex) & 1
+                    
+                    // Black = 1, White = 0 in MacPaint
+                    let color: UInt8 = (bit == 1) ? 0 : 255
+                    
+                    let bufferIdx = (y * width + x) * 4
+                    rgbaBuffer[bufferIdx] = color
+                    rgbaBuffer[bufferIdx + 1] = color
+                    rgbaBuffer[bufferIdx + 2] = color
+                    rgbaBuffer[bufferIdx + 3] = 255
+                }
+            }
+        }
+        
+        guard let cgImage = createCGImage(from: rgbaBuffer, width: width, height: height) else {
+            return (nil, .Unknown)
+        }
+        
+        return (cgImage, .MacPaint)
+    }
+    
+    // --- BMP Decoder (Windows Bitmap format) ---
+    
+    static func decodeBMP(data: Data) -> (image: CGImage?, type: AppleIIImageType) {
+        guard data.count >= 54 else { // Minimum BMP size
+            return (nil, .Unknown)
+        }
+        
+        // BMP Header (14 bytes)
+        // Check "BM" magic bytes
+        guard data[0] == 0x42 && data[1] == 0x4D else {
+            return (nil, .Unknown)
+        }
+        
+        // DIB Header offset (starts at byte 14)
+        let dibHeaderSize = Int(data[14]) | (Int(data[15]) << 8) | (Int(data[16]) << 16) | (Int(data[17]) << 24)
+        
+        // Read image dimensions (little-endian)
+        let width = Int(data[18]) | (Int(data[19]) << 8) | (Int(data[20]) << 16) | (Int(data[21]) << 24)
+        var height = Int(data[22]) | (Int(data[23]) << 8) | (Int(data[24]) << 16) | (Int(data[25]) << 24)
+        
+        // Height can be negative (top-down bitmap)
+        let topDown = height < 0
+        if topDown {
+            height = -height
+        }
+        
+        let planes = Int(data[26]) | (Int(data[27]) << 8)
+        let bitsPerPixel = Int(data[28]) | (Int(data[29]) << 8)
+        let compression = Int(data[30]) | (Int(data[31]) << 8) | (Int(data[32]) << 16) | (Int(data[33]) << 24)
+        
+        // Only support uncompressed BMPs for now
+        guard compression == 0 else {
+            return (nil, .Unknown)
+        }
+        
+        guard width > 0 && height > 0 && width < 10000 && height < 10000 else {
+            return (nil, .Unknown)
+        }
+        
+        // Get pixel data offset
+        let pixelDataOffset = Int(data[10]) | (Int(data[11]) << 8) | (Int(data[12]) << 16) | (Int(data[13]) << 24)
+        
+        // Read palette if present (for <= 8 bit images)
+        var palette: [(r: UInt8, g: UInt8, b: UInt8)] = []
+        if bitsPerPixel <= 8 {
+            let numColors = 1 << bitsPerPixel
+            let paletteOffset = 14 + dibHeaderSize
+            
+            for i in 0..<numColors {
+                let offset = paletteOffset + (i * 4)
+                if offset + 3 < data.count {
+                    let b = data[offset]
+                    let g = data[offset + 1]
+                    let r = data[offset + 2]
+                    // Fourth byte is reserved/alpha
+                    palette.append((r, g, b))
+                }
+            }
+        }
+        
+        var rgbaBuffer = [UInt8](repeating: 0, count: width * height * 4)
+        
+        // BMP rows are padded to 4-byte boundaries
+        let bytesPerPixel = bitsPerPixel / 8
+        let rowSize = ((bitsPerPixel * width + 31) / 32) * 4
+        
+        // Decode based on bit depth
+        if bitsPerPixel == 24 {
+            // 24-bit RGB (no alpha)
+            for y in 0..<height {
+                let actualY = topDown ? y : (height - 1 - y) // BMP is bottom-up by default
+                let rowOffset = pixelDataOffset + (y * rowSize)
+                
+                for x in 0..<width {
+                    let pixelOffset = rowOffset + (x * 3)
+                    if pixelOffset + 2 < data.count {
+                        let b = data[pixelOffset]
+                        let g = data[pixelOffset + 1]
+                        let r = data[pixelOffset + 2]
+                        
+                        let bufferIdx = (actualY * width + x) * 4
+                        rgbaBuffer[bufferIdx] = r
+                        rgbaBuffer[bufferIdx + 1] = g
+                        rgbaBuffer[bufferIdx + 2] = b
+                        rgbaBuffer[bufferIdx + 3] = 255
+                    }
+                }
+            }
+        } else if bitsPerPixel == 8 {
+            // 8-bit indexed
+            for y in 0..<height {
+                let actualY = topDown ? y : (height - 1 - y)
+                let rowOffset = pixelDataOffset + (y * rowSize)
+                
+                for x in 0..<width {
+                    let pixelOffset = rowOffset + x
+                    if pixelOffset < data.count {
+                        let paletteIndex = Int(data[pixelOffset])
+                        if paletteIndex < palette.count {
+                            let color = palette[paletteIndex]
+                            let bufferIdx = (actualY * width + x) * 4
+                            rgbaBuffer[bufferIdx] = color.r
+                            rgbaBuffer[bufferIdx + 1] = color.g
+                            rgbaBuffer[bufferIdx + 2] = color.b
+                            rgbaBuffer[bufferIdx + 3] = 255
+                        }
+                    }
+                }
+            }
+        } else if bitsPerPixel == 4 {
+            // 4-bit indexed (2 pixels per byte)
+            for y in 0..<height {
+                let actualY = topDown ? y : (height - 1 - y)
+                let rowOffset = pixelDataOffset + (y * rowSize)
+                
+                for x in 0..<width {
+                    let byteOffset = rowOffset + (x / 2)
+                    if byteOffset < data.count {
+                        let byte = data[byteOffset]
+                        let paletteIndex = (x % 2 == 0) ? Int(byte >> 4) : Int(byte & 0x0F)
+                        
+                        if paletteIndex < palette.count {
+                            let color = palette[paletteIndex]
+                            let bufferIdx = (actualY * width + x) * 4
+                            rgbaBuffer[bufferIdx] = color.r
+                            rgbaBuffer[bufferIdx + 1] = color.g
+                            rgbaBuffer[bufferIdx + 2] = color.b
+                            rgbaBuffer[bufferIdx + 3] = 255
+                        }
+                    }
+                }
+            }
+        } else if bitsPerPixel == 1 {
+            // 1-bit monochrome (8 pixels per byte)
+            for y in 0..<height {
+                let actualY = topDown ? y : (height - 1 - y)
+                let rowOffset = pixelDataOffset + (y * rowSize)
+                
+                for x in 0..<width {
+                    let byteOffset = rowOffset + (x / 8)
+                    if byteOffset < data.count {
+                        let byte = data[byteOffset]
+                        let bitIndex = 7 - (x % 8)
+                        let bit = (byte >> bitIndex) & 1
+                        
+                        let color = palette[Int(bit)]
+                        let bufferIdx = (actualY * width + x) * 4
+                        rgbaBuffer[bufferIdx] = color.r
+                        rgbaBuffer[bufferIdx + 1] = color.g
+                        rgbaBuffer[bufferIdx + 2] = color.b
+                        rgbaBuffer[bufferIdx + 3] = 255
+                    }
+                }
+            }
+        }
+        
+        guard let cgImage = createCGImage(from: rgbaBuffer, width: width, height: height) else {
+            return (nil, .Unknown)
+        }
+        
+        return (cgImage, .BMP(width: width, height: height, bitsPerPixel: bitsPerPixel))
+    }
     
     // --- PCX Decoder (ZSoft PC Paintbrush format) ---
     
@@ -2125,6 +2444,16 @@ class SHRDecoder {
         }
         
         return createCGImage(from: rgbaBuffer, width: width, height: height)
+    }
+    
+    // Upscale CGImage using nearest neighbor (pixel-perfect retro look)
+    static func upscaleCGImage(_ image: CGImage, factor: Int) -> CGImage? {
+        guard factor > 1 else { return image }
+        
+        let newWidth = image.width * factor
+        let newHeight = image.height * factor
+        
+        return scaleCGImage(image, to: CGSize(width: newWidth, height: newHeight))
     }
     
     static func scaleCGImage(_ image: CGImage, to newSize: CGSize) -> CGImage? {
