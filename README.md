@@ -12,6 +12,8 @@ Was bored and added then more graphic formats...
 <li>ZX Spectrum: SCR</li>  
 <li>Amstrad CPC: Mode 0 (160x200) + Mode 1 (320x200)</li>  
 <li>PCX: 1/2/4/8/24-bit mit RLE (inkl. CGA 2-bit!)</li>
+<li>BMP: (1/4/8/24-bit)</li>li>
+<li>MacPaint: (1-bit)</li>
 </ul>
 Features:
 
