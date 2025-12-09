@@ -4,19 +4,19 @@ Newly added are now HGR and DHGR conversion and output formats like png, jpg, ti
 Added graphic formats for Amiga, Atari ST and C64.
 
 🎨 Supported formats:
-
-Apple II: SHR (Standard + 3200 Colour), HGR, DHGR
-Amiga: IFF/ILBM (Indexed Colour + 24-bit RGB with LSB-first)
-Atari ST: Degas PI1/PI2/PI3 (Low/Medium/High Res)
-C64: Koala Painter
-
+<ul>
+<li>Apple II: SHR (Standard + 3200 Colour), HGR, DHGR</li>
+<li>Amiga: IFF/ILBM (Indexed Colour + 24-bit RGB with LSB-first)</li>
+<li>Atari ST: Degas PI1/PI2/PI3 (Low/Medium/High Res)</li>
+<li>C64: Koala Painter, Art Studio</li>
+</ul>
 Features:
 
-📁 Image browser with thumbnails
-🗂️ Folder support (drag & drop + open)
-💾 Batch export (PNG, JPEG, TIFF, GIF, HEIC)
-⚡ Recursive scanning of subfolders
-🎯 Export single image or all images
+📁 Image browser with thumbnails<br>
+🗂️ Folder support (drag & drop + open)<br>
+💾 Batch export (PNG, JPEG, TIFF, GIF, HEIC)<br>
+⚡ Recursive scanning of subfolders<br>
+🎯 Export single image or all images<br>
 
 NEW version 2 now with image browser
 
