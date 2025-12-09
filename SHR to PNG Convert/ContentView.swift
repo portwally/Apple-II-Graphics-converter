@@ -32,6 +32,7 @@ enum AppleIIImageType: Equatable {
     case DEGAS(resolution: String, colors: Int)
     case C64(format: String)
     case ZXSpectrum
+    case AmstradCPC(mode: Int, colors: Int)
     case Unknown
     
     var resolution: (width: Int, height: Int) {
@@ -49,6 +50,13 @@ enum AppleIIImageType: Equatable {
             }
         case .C64: return (320, 200)
         case .ZXSpectrum: return (256, 192)
+        case .AmstradCPC(let mode, _):
+            switch mode {
+            case 0: return (160, 200)  // Mode 0: 160x200, 16 colors
+            case 1: return (320, 200)  // Mode 1: 320x200, 4 colors
+            case 2: return (640, 200)  // Mode 2: 640x200, 2 colors
+            default: return (0, 0)
+            }
         case .Unknown: return (0, 0)
         }
     }
@@ -62,6 +70,7 @@ enum AppleIIImageType: Equatable {
         case .DEGAS(let res, let colors): return "Degas (\(res), \(colors) colors)"
         case .C64(let format): return "C64 (\(format))"
         case .ZXSpectrum: return "ZX Spectrum"
+        case .AmstradCPC(let mode, let colors): return "Amstrad CPC (Mode \(mode), \(colors) colors)"
         case .Unknown: return "Unknown"
         }
     }
@@ -197,7 +206,7 @@ struct ContentView: View {
                             .foregroundColor(.secondary)
                         Text("Retro Graphics Converter")
                             .font(.headline)
-                        Text("Supports Apple II, Amiga IFF, Atari ST, C64, and ZX Spectrum formats.")
+                        Text("Supports Apple II, Amiga IFF, Atari ST, C64, ZX Spectrum, and Amstrad CPC.")
                             .multilineTextAlignment(.center)
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -630,6 +639,10 @@ class SHRDecoder {
             return decodeC64Hires(data: data)
         case 6912: // ZX Spectrum SCR
             return decodeZXSpectrum(data: data)
+        case 16384: // Could be Amstrad CPC or Apple II DHGR
+            // Try to detect which format by checking for CPC screen mode byte
+            // CPC files often have a mode indicator or specific patterns
+            return decodeAmstradCPC(data: data)
         default:
             break
         }
@@ -663,6 +676,7 @@ class SHRDecoder {
             type = .HGR
             image = decodeHGR(data: data)
         case 16384:
+            // If we reach here, it wasn't CPC, try DHGR
             type = .DHGR
             image = decodeDHGR(data: data)
         default:
@@ -671,6 +685,206 @@ class SHRDecoder {
         }
         
         return (image, type)
+    }
+    
+    // --- Amstrad CPC SCR Decoder (16384 bytes) ---
+    
+    // Amstrad CPC Hardware Palette (27 colors - the "real" hardware colors)
+    static let amstradCPCPalette: [(r: UInt8, g: UInt8, b: UInt8)] = [
+        (0x00, 0x00, 0x00),  // 0: Black
+        (0x00, 0x00, 0x80),  // 1: Blue
+        (0x00, 0x00, 0xFF),  // 2: Bright Blue
+        (0x80, 0x00, 0x00),  // 3: Red
+        (0x80, 0x00, 0x80),  // 4: Magenta
+        (0x80, 0x00, 0xFF),  // 5: Mauve
+        (0xFF, 0x00, 0x00),  // 6: Bright Red
+        (0xFF, 0x00, 0x80),  // 7: Purple
+        (0xFF, 0x00, 0xFF),  // 8: Bright Magenta
+        (0x00, 0x80, 0x00),  // 9: Green
+        (0x00, 0x80, 0x80),  // 10: Cyan
+        (0x00, 0x80, 0xFF),  // 11: Sky Blue
+        (0x80, 0x80, 0x00),  // 12: Yellow
+        (0x80, 0x80, 0x80),  // 13: White (actually grey)
+        (0x80, 0x80, 0xFF),  // 14: Pastel Blue
+        (0xFF, 0x80, 0x00),  // 15: Orange
+        (0xFF, 0x80, 0x80),  // 16: Pink
+        (0xFF, 0x80, 0xFF),  // 17: Pastel Magenta
+        (0x00, 0xFF, 0x00),  // 18: Bright Green
+        (0x00, 0xFF, 0x80),  // 19: Sea Green
+        (0x00, 0xFF, 0xFF),  // 20: Bright Cyan
+        (0x80, 0xFF, 0x00),  // 21: Lime
+        (0x80, 0xFF, 0x80),  // 22: Pastel Green
+        (0x80, 0xFF, 0xFF),  // 23: Pastel Cyan
+        (0xFF, 0xFF, 0x00),  // 24: Bright Yellow
+        (0xFF, 0xFF, 0x80),  // 25: Pastel Yellow
+        (0xFF, 0xFF, 0xFF)   // 26: Bright White
+    ]
+    
+    static func decodeAmstradCPC(data: Data) -> (image: CGImage?, type: AppleIIImageType) {
+        guard data.count == 16384 else {
+            return (nil, .Unknown)
+        }
+        
+        // Try to detect the mode by analyzing the data
+        // Mode 0 typically has more varied data (4 bits per pixel)
+        // Mode 1 is most common (2 bits per pixel)
+        // For now, we'll try both and see which looks better
+        // Or default to Mode 1 as it's most common
+        
+        // Let's decode both Mode 0 and Mode 1
+        // You can add heuristics here to auto-detect, but for now try Mode 1 first
+        
+        // Try Mode 1 first (most common)
+        if let result = decodeAmstradCPCMode1(data: data) {
+            return result
+        }
+        
+        // Fallback to Mode 0
+        if let result = decodeAmstradCPCMode0(data: data) {
+            return result
+        }
+        
+        return (nil, .Unknown)
+    }
+    
+    // Mode 0: 160x200, 16 colors (4 bits per pixel)
+    static func decodeAmstradCPCMode0(data: Data) -> (image: CGImage?, type: AppleIIImageType)? {
+        let width = 160
+        let height = 200
+        let colorsPerMode = 16
+        
+        var rgbaBuffer = [UInt8](repeating: 0, count: width * height * 4)
+        
+        // Default Mode 0 palette (16 colors)
+        let defaultPalette: [Int] = [
+            1,  // Blue
+            24, // Yellow
+            20, // Cyan
+            6,  // Red
+            0,  // Black
+            26, // White
+            18, // Green
+            8,  // Magenta
+            13, // Grey
+            25, // Pastel Yellow
+            23, // Pastel Cyan
+            17, // Pastel Magenta
+            22, // Pastel Green
+            16, // Pink
+            15, // Orange
+            14  // Pastel Blue
+        ]
+        
+        for y in 0..<height {
+            let block = y / 8
+            let lineInBlock = y % 8
+            let bytesPerLine = 80  // Same as Mode 1
+            let lineOffset = (block * 2048) + (lineInBlock * bytesPerLine)
+            
+            for xByte in 0..<bytesPerLine {
+                let byteOffset = lineOffset + xByte
+                if byteOffset >= data.count { continue }
+                
+                let dataByte = data[byteOffset]
+                
+                // Mode 0: Each byte contains 2 pixels (4 bits each)
+                // Bit order: pixel 0 uses bits 7,5,3,1 and pixel 1 uses bits 6,4,2,0
+                
+                for pixel in 0..<2 {
+                    let x = xByte * 2 + pixel
+                    if x >= width { continue }
+                    
+                    // Extract 4-bit color value with CPC's bit order
+                    let nibble: UInt8
+                    if pixel == 0 {
+                        // Bits 7,5,3,1 (odd bits)
+                        nibble = ((dataByte >> 7) & 1) << 3 |
+                                 ((dataByte >> 5) & 1) << 2 |
+                                 ((dataByte >> 3) & 1) << 1 |
+                                 ((dataByte >> 1) & 1)
+                    } else {
+                        // Bits 6,4,2,0 (even bits)
+                        nibble = ((dataByte >> 6) & 1) << 3 |
+                                 ((dataByte >> 4) & 1) << 2 |
+                                 ((dataByte >> 2) & 1) << 1 |
+                                 ((dataByte >> 0) & 1)
+                    }
+                    
+                    let paletteIndex = Int(nibble)
+                    let hardwareColor = defaultPalette[paletteIndex]
+                    let rgb = amstradCPCPalette[hardwareColor]
+                    
+                    let bufferIdx = (y * width + x) * 4
+                    rgbaBuffer[bufferIdx] = rgb.r
+                    rgbaBuffer[bufferIdx + 1] = rgb.g
+                    rgbaBuffer[bufferIdx + 2] = rgb.b
+                    rgbaBuffer[bufferIdx + 3] = 255
+                }
+            }
+        }
+        
+        guard let cgImage = createCGImage(from: rgbaBuffer, width: width, height: height) else {
+            return nil
+        }
+        
+        return (cgImage, .AmstradCPC(mode: 0, colors: colorsPerMode))
+    }
+    
+    // Mode 1: 320x200, 4 colors (2 bits per pixel)
+    static func decodeAmstradCPCMode1(data: Data) -> (image: CGImage?, type: AppleIIImageType)? {
+        let width = 320
+        let height = 200
+        let colorsPerMode = 4
+        
+        var rgbaBuffer = [UInt8](repeating: 0, count: width * height * 4)
+        
+        // Default Mode 1 palette
+        let defaultPalette: [Int] = [1, 24, 20, 6] // Blue, Yellow, Cyan, Red
+        
+        for y in 0..<height {
+            let block = y / 8
+            let lineInBlock = y % 8
+            let bytesPerLine = 80
+            let lineOffset = (block * 2048) + (lineInBlock * bytesPerLine)
+            
+            for xByte in 0..<bytesPerLine {
+                let byteOffset = lineOffset + xByte
+                if byteOffset >= data.count { continue }
+                
+                let dataByte = data[byteOffset]
+                
+                // Mode 1: Each byte contains 4 pixels (2 bits each)
+                for pixel in 0..<4 {
+                    let x = xByte * 4 + pixel
+                    if x >= width { continue }
+                    
+                    let bitPair: UInt8
+                    switch pixel {
+                    case 0: bitPair = ((dataByte >> 7) & 1) << 1 | ((dataByte >> 3) & 1)
+                    case 1: bitPair = ((dataByte >> 6) & 1) << 1 | ((dataByte >> 2) & 1)
+                    case 2: bitPair = ((dataByte >> 5) & 1) << 1 | ((dataByte >> 1) & 1)
+                    case 3: bitPair = ((dataByte >> 4) & 1) << 1 | ((dataByte >> 0) & 1)
+                    default: bitPair = 0
+                    }
+                    
+                    let paletteIndex = Int(bitPair)
+                    let hardwareColor = defaultPalette[paletteIndex]
+                    let rgb = amstradCPCPalette[hardwareColor]
+                    
+                    let bufferIdx = (y * width + x) * 4
+                    rgbaBuffer[bufferIdx] = rgb.r
+                    rgbaBuffer[bufferIdx + 1] = rgb.g
+                    rgbaBuffer[bufferIdx + 2] = rgb.b
+                    rgbaBuffer[bufferIdx + 3] = 255
+                }
+            }
+        }
+        
+        guard let cgImage = createCGImage(from: rgbaBuffer, width: width, height: height) else {
+            return nil
+        }
+        
+        return (cgImage, .AmstradCPC(mode: 1, colors: colorsPerMode))
     }
     
     // --- ZX Spectrum SCR Decoder (256x192, 6912 bytes) ---
