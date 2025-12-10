@@ -36,6 +36,7 @@ enum AppleIIImageType: Equatable {
     case PCX(width: Int, height: Int, bitsPerPixel: Int)
     case BMP(width: Int, height: Int, bitsPerPixel: Int)
     case MacPaint
+    case ModernImage(format: String, width: Int, height: Int)
     case Unknown
     
     var resolution: (width: Int, height: Int) {
@@ -63,6 +64,7 @@ enum AppleIIImageType: Equatable {
         case .PCX(let width, let height, _): return (width, height)
         case .BMP(let width, let height, _): return (width, height)
         case .MacPaint: return (576, 720)
+        case .ModernImage(_, let width, let height): return (width, height)
         case .Unknown: return (0, 0)
         }
     }
@@ -80,6 +82,7 @@ enum AppleIIImageType: Equatable {
         case .PCX(let width, let height, let bpp): return "PCX (\(width)x\(height), \(bpp)-bit)"
         case .BMP(let width, let height, let bpp): return "BMP (\(width)x\(height), \(bpp)-bit)"
         case .MacPaint: return "MacPaint (576x720, 1-bit)"
+        case .ModernImage(let format, let width, let height): return "\(format) (\(width)x\(height))"
         case .Unknown: return "Unknown"
         }
     }
@@ -122,6 +125,41 @@ struct ContentView: View {
     @State private var progressString = ""
     @State private var showBrowser = false
     @State private var upscaleFactor: Int = 1 // 1 = no upscaling, 2/4/8 = upscale
+    @State private var zoomScale: CGFloat = 1.0
+    @State private var imageOffset: CGSize = .zero
+    @State private var filterFormat: String = "All"
+    
+    var filteredImages: [ImageItem] {
+        if filterFormat == "All" {
+            return imageItems
+        }
+        
+        return imageItems.filter { item in
+            let typeName = item.type.displayName
+            switch filterFormat {
+            case "Apple II":
+                return typeName.contains("SHR") || typeName.contains("HGR") || typeName.contains("DHGR")
+            case "C64":
+                return typeName.contains("C64")
+            case "Amiga":
+                return typeName.contains("IFF")
+            case "Atari ST":
+                return typeName.contains("DEGAS")
+            case "ZX Spectrum":
+                return typeName.contains("ZX Spectrum")
+            case "CPC":
+                return typeName.contains("CPC")
+            case "PC":
+                return typeName.contains("PCX") || typeName.contains("BMP")
+            case "Mac":
+                return typeName.contains("MacPaint")
+            case "Modern":
+                return typeName.contains("PNG") || typeName.contains("JPEG") || typeName.contains("GIF") || typeName.contains("TIFF") || typeName.contains("HEIC") || typeName.contains("WEBP")
+            default:
+                return true
+            }
+        }
+    }
     
     var body: some View {
         HSplitView {
@@ -152,11 +190,31 @@ struct ContentView: View {
                 .help("Clear all images")
             }
             
+            // Format Filter
+            HStack {
+                Text("Filter:")
+                    .font(.caption)
+                Picker("", selection: $filterFormat) {
+                    Text("All").tag("All")
+                    Text("Apple II").tag("Apple II")
+                    Text("C64").tag("C64")
+                    Text("Amiga").tag("Amiga")
+                    Text("Atari ST").tag("Atari ST")
+                    Text("ZX Spectrum").tag("ZX Spectrum")
+                    Text("Amstrad CPC").tag("CPC")
+                    Text("PC (PCX/BMP)").tag("PC")
+                    Text("Mac").tag("Mac")
+                    Text("Modern (PNG/JPG)").tag("Modern")
+                }
+                .labelsHidden()
+                Spacer()
+            }
+            
             Divider()
             
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)], spacing: 10) {
-                    ForEach(imageItems) { item in
+                    ForEach(filteredImages) { item in
                         ImageThumbnailView(item: item, isSelected: selectedImage?.id == item.id)
                             .onTapGesture {
                                 selectedImage = item
@@ -165,10 +223,14 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 5)
             }
+            .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+                loadDroppedFiles(providers)
+                return true
+            }
             
             Divider()
             
-            Text("\(imageItems.count) image(s) loaded")
+            Text("\(filteredImages.count) of \(imageItems.count) image(s)")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -189,11 +251,48 @@ struct ContentView: View {
                 
                 if let selectedImg = selectedImage {
                     VStack(spacing: 10) {
-                        Image(nsImage: selectedImg.image)
-                            .resizable()
-                            .interpolation(.none)
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 400)
+                        // Zoomable/Pannable Image
+                        GeometryReader { geometry in
+                            ScrollView([.horizontal, .vertical], showsIndicators: true) {
+                                Image(nsImage: selectedImg.image)
+                                    .resizable()
+                                    .interpolation(.none)
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: selectedImg.image.size.width * zoomScale,
+                                           height: selectedImg.image.size.height * zoomScale)
+                                    .offset(imageOffset)
+                                    .gesture(
+                                        MagnificationGesture()
+                                            .onChanged { value in
+                                                zoomScale = max(0.5, min(value, 10.0))
+                                            }
+                                    )
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: 400)
+                        }
+                        .frame(maxHeight: 400)
+                        
+                        // Zoom Controls
+                        HStack(spacing: 10) {
+                            Button("Zoom Out") {
+                                zoomScale = max(0.5, zoomScale / 1.5)
+                            }
+                            
+                            Text("\(Int(zoomScale * 100))%")
+                                .frame(width: 60)
+                            
+                            Button("Zoom In") {
+                                zoomScale = min(10.0, zoomScale * 1.5)
+                            }
+                            
+                            Button("Reset") {
+                                zoomScale = 1.0
+                                imageOffset = .zero
+                            }
+                            
+                            Spacer()
+                        }
+                        .font(.caption)
                         
                         HStack {
                             Text(selectedImg.filename)
@@ -216,7 +315,7 @@ struct ContentView: View {
                             .foregroundColor(.secondary)
                         Text("Retro Graphics Converter")
                             .font(.headline)
-                        Text("Supports Apple II, Amiga IFF, Atari ST, C64, ZX Spectrum, Amstrad CPC, PCX, BMP, and MacPaint.")
+                        Text("Supports Apple II, Amiga IFF, Atari ST, C64, ZX Spectrum, Amstrad CPC, PCX, BMP, MacPaint, plus modern formats (PNG, JPEG, GIF).")
                             .multilineTextAlignment(.center)
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -289,6 +388,11 @@ struct ContentView: View {
                         exportAllImages()
                     }
                     .disabled(imageItems.isEmpty || isProcessing)
+                    
+                    Button("Export with Custom Names...") {
+                        showBatchRename()
+                    }
+                    .disabled(imageItems.isEmpty || isProcessing)
                 }
                 
                 if let selected = selectedImage {
@@ -328,13 +432,81 @@ struct ContentView: View {
         showBrowser = false
     }
     
+    func showBatchRename() {
+        let alert = NSAlert()
+        alert.messageText = "Batch Export with Custom Names"
+        alert.informativeText = "Export all images with custom names. Use {n} for number, {name} for original name.\nExample: converted_{n} → converted_1.png, converted_2.png, etc."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Export")
+        alert.addButton(withTitle: "Cancel")
+        
+        let inputField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        inputField.stringValue = "{name}_converted"
+        inputField.placeholderString = "e.g., image_{n} or {name}_export"
+        alert.accessoryView = inputField
+        
+        let response = alert.runModal()
+        
+        if response == .alertFirstButtonReturn {
+            let pattern = inputField.stringValue
+            batchExportWithRename(pattern: pattern)
+        }
+    }
+    
+    func batchExportWithRename(pattern: String) {
+        guard !imageItems.isEmpty else { return }
+        
+        // Ask for output folder
+        let openPanel = NSOpenPanel()
+        openPanel.canChooseFiles = false
+        openPanel.canChooseDirectories = true
+        openPanel.allowsMultipleSelection = false
+        openPanel.canCreateDirectories = true
+        openPanel.showsHiddenFiles = false
+        openPanel.prompt = "Select Export Folder"
+
+        if openPanel.runModal() == .OK, let outputFolderURL = openPanel.url {
+            isProcessing = true
+            
+            DispatchQueue.global(qos: .userInitiated).async {
+                var successCount = 0
+                
+                for (index, item) in self.imageItems.enumerated() {
+                    DispatchQueue.main.async {
+                        self.progressString = "Exporting \(index + 1) of \(self.imageItems.count)"
+                    }
+                    
+                    let originalName = item.url.deletingPathExtension().lastPathComponent
+                    
+                    // Replace placeholders
+                    var newName = pattern
+                    newName = newName.replacingOccurrences(of: "{n}", with: "\(index + 1)")
+                    newName = newName.replacingOccurrences(of: "{name}", with: originalName)
+                    
+                    let filename = "\(newName).\(self.selectedExportFormat.fileExtension)"
+                    let outputURL = outputFolderURL.appendingPathComponent(filename)
+                    
+                    if self.saveImage(image: item.image, to: outputURL, format: self.selectedExportFormat) {
+                        successCount += 1
+                    }
+                }
+                
+                DispatchQueue.main.async {
+                    self.isProcessing = false
+                    self.statusMessage = "Exported \(successCount) of \(self.imageItems.count) image(s) with custom names"
+                    self.progressString = ""
+                }
+            }
+        }
+    }
+    
     func openFiles() {
         let openPanel = NSOpenPanel()
         openPanel.allowedContentTypes = [.data]
         openPanel.allowsMultipleSelection = true
         openPanel.canChooseDirectories = true
         openPanel.canChooseFiles = true
-        openPanel.prompt = "Open Apple II/IIGS Graphics Files or Folders"
+        openPanel.prompt = "Open Files or Folders"
 
         if openPanel.runModal() == .OK {
             processFilesAndFolders(urls: openPanel.urls)
@@ -651,6 +823,29 @@ class SHRDecoder {
         // Use filename extension as a hint if available
         let fileExtension = filename?.split(separator: ".").last?.lowercased() ?? ""
         
+        // Check for modern image formats first (PNG, JPEG, GIF, TIFF, HEIC)
+        // These should be recognized before retro formats to avoid false positives
+        let modernFormats = ["png", "jpg", "jpeg", "gif", "tiff", "tif", "heic", "heif", "webp"]
+        if modernFormats.contains(fileExtension) {
+            return decodeModernImage(data: data, format: fileExtension)
+        }
+        
+        // Also check PNG/JPEG/GIF by magic bytes
+        if size >= 8 {
+            // PNG: starts with 0x89 0x50 0x4E 0x47
+            if data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 {
+                return decodeModernImage(data: data, format: "png")
+            }
+            // JPEG: starts with 0xFF 0xD8
+            if data[0] == 0xFF && data[1] == 0xD8 {
+                return decodeModernImage(data: data, format: "jpeg")
+            }
+            // GIF: starts with "GIF87a" or "GIF89a"
+            if data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46 {
+                return decodeModernImage(data: data, format: "gif")
+            }
+        }
+        
         // Check for BMP format (starts with "BM")
         if size >= 14 && data[0] == 0x42 && data[1] == 0x4D {
             return decodeBMP(data: data)
@@ -669,10 +864,13 @@ class SHRDecoder {
             }
         }
         
-        // Check for C64 formats (by exact file size)
-        switch size {
-        case 10003: // Koala Painter
+        // Check for C64 Koala format (10003 bytes nominal, but sometimes has extra bytes)
+        if size >= 10003 && size <= 10010 {
             return decodeC64Koala(data: data)
+        }
+        
+        // Check for other C64 formats and other platforms by exact size
+        switch size {
         case 10018: // Art Studio variant
             return decodeC64ArtStudio(data: data)
         case 9009: // Art Studio HIRES or similar
@@ -875,6 +1073,23 @@ class SHRDecoder {
         }
         
         return (cgImage, .MacPaint)
+    }
+    
+    // --- Modern Image Decoder (PNG, JPEG, GIF, etc.) ---
+    
+    static func decodeModernImage(data: Data, format: String) -> (image: CGImage?, type: AppleIIImageType) {
+        // Use ImageIO to decode modern formats
+        guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
+              CGImageSourceGetCount(imageSource) > 0,
+              let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
+            return (nil, .Unknown)
+        }
+        
+        let width = cgImage.width
+        let height = cgImage.height
+        let formatName = format.uppercased()
+        
+        return (cgImage, .ModernImage(format: formatName, width: width, height: height))
     }
     
     // --- BMP Decoder (Windows Bitmap format) ---
@@ -1666,7 +1881,8 @@ class SHRDecoder {
     // Koala Painter (.KOA, .KLA) - 10003 bytes
     // Format: 2 bytes load address + 8000 bytes bitmap + 1000 bytes screen RAM + 1000 bytes color RAM + 1 byte background
     static func decodeC64Koala(data: Data) -> (image: CGImage?, type: AppleIIImageType) {
-        guard data.count == 10003 else {
+        // Koala files are nominally 10003 bytes, but some have 2-7 extra padding bytes
+        guard data.count >= 10003 && data.count <= 10010 else {
             return (nil, .Unknown)
         }
         
@@ -1737,6 +1953,10 @@ class SHRDecoder {
         
         return (cgImage, .C64(format: "Koala Painter"))
     }
+    
+    // C64 FLI (Flexible Line Interpretation) - ~16000 bytes with BASIC loader
+    // FLI allows changing colors every line instead of every 8 lines
+    // Note: FLI decoding is experimental - some images may not display perfectly
     
     // Advanced Art Studio (.ART, .OCP) - 10018 bytes
     // Note: Many 10018 byte files are actually Koala format with 15 extra bytes

@@ -24,15 +24,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		3E9C9E9A2EE37BDF00DEE453 /* Image-Convert-Apple-II-MacOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Image-Convert-Apple-II-MacOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		3E9C9EA72EE37BE000DEE453 /* Image-Convert-Apple-II-MacOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Image-Convert-Apple-II-MacOSTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		3E9C9EB12EE37BE000DEE453 /* Image-Convert-Apple-II-MacOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Image-Convert-Apple-II-MacOSUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3E9C9E9A2EE37BDF00DEE453 /* Retro-Graphics-Converter.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Retro-Graphics-Converter.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3E9C9EA72EE37BE000DEE453 /* Retro-Graphics-ConverterTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Retro-Graphics-ConverterTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3E9C9EB12EE37BE000DEE453 /* Retro-Graphics-ConverterUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Retro-Graphics-ConverterUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		3E9C9E9C2EE37BDF00DEE453 /* SHR to PNG Convert */ = {
+		3E9C9E9C2EE37BDF00DEE453 /* Retro-Graphics-converter */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "SHR to PNG Convert";
+			path = "Retro-Graphics-converter";
 			sourceTree = "<group>";
 		};
 		3E9C9EAA2EE37BE000DEE453 /* SHR to PNG ConvertTests */ = {
@@ -75,7 +75,7 @@
 		3E9C9E912EE37BDF00DEE453 = {
 			isa = PBXGroup;
 			children = (
-				3E9C9E9C2EE37BDF00DEE453 /* SHR to PNG Convert */,
+				3E9C9E9C2EE37BDF00DEE453 /* Retro-Graphics-converter */,
 				3E9C9EAA2EE37BE000DEE453 /* SHR to PNG ConvertTests */,
 				3E9C9EB42EE37BE000DEE453 /* SHR to PNG ConvertUITests */,
 				3E9C9E9B2EE37BDF00DEE453 /* Products */,
@@ -85,9 +85,9 @@
 		3E9C9E9B2EE37BDF00DEE453 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				3E9C9E9A2EE37BDF00DEE453 /* Image-Convert-Apple-II-MacOS.app */,
-				3E9C9EA72EE37BE000DEE453 /* Image-Convert-Apple-II-MacOSTests.xctest */,
-				3E9C9EB12EE37BE000DEE453 /* Image-Convert-Apple-II-MacOSUITests.xctest */,
+				3E9C9E9A2EE37BDF00DEE453 /* Retro-Graphics-Converter.app */,
+				3E9C9EA72EE37BE000DEE453 /* Retro-Graphics-ConverterTests.xctest */,
+				3E9C9EB12EE37BE000DEE453 /* Retro-Graphics-ConverterUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,9 +95,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		3E9C9E992EE37BDF00DEE453 /* Image-Convert-Apple-II-MacOS */ = {
+		3E9C9E992EE37BDF00DEE453 /* Retro-Graphics-Converter */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3E9C9EBB2EE37BE000DEE453 /* Build configuration list for PBXNativeTarget "Image-Convert-Apple-II-MacOS" */;
+			buildConfigurationList = 3E9C9EBB2EE37BE000DEE453 /* Build configuration list for PBXNativeTarget "Retro-Graphics-Converter" */;
 			buildPhases = (
 				3E9C9E962EE37BDF00DEE453 /* Sources */,
 				3E9C9E972EE37BDF00DEE453 /* Frameworks */,
@@ -108,18 +108,18 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				3E9C9E9C2EE37BDF00DEE453 /* SHR to PNG Convert */,
+				3E9C9E9C2EE37BDF00DEE453 /* Retro-Graphics-converter */,
 			);
-			name = "Image-Convert-Apple-II-MacOS";
+			name = "Retro-Graphics-Converter";
 			packageProductDependencies = (
 			);
 			productName = "SHR to PNG Convert";
-			productReference = 3E9C9E9A2EE37BDF00DEE453 /* Image-Convert-Apple-II-MacOS.app */;
+			productReference = 3E9C9E9A2EE37BDF00DEE453 /* Retro-Graphics-Converter.app */;
 			productType = "com.apple.product-type.application";
 		};
-		3E9C9EA62EE37BE000DEE453 /* Image-Convert-Apple-II-MacOSTests */ = {
+		3E9C9EA62EE37BE000DEE453 /* Retro-Graphics-ConverterTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3E9C9EBE2EE37BE000DEE453 /* Build configuration list for PBXNativeTarget "Image-Convert-Apple-II-MacOSTests" */;
+			buildConfigurationList = 3E9C9EBE2EE37BE000DEE453 /* Build configuration list for PBXNativeTarget "Retro-Graphics-ConverterTests" */;
 			buildPhases = (
 				3E9C9EA32EE37BE000DEE453 /* Sources */,
 				3E9C9EA42EE37BE000DEE453 /* Frameworks */,
@@ -133,16 +133,16 @@
 			fileSystemSynchronizedGroups = (
 				3E9C9EAA2EE37BE000DEE453 /* SHR to PNG ConvertTests */,
 			);
-			name = "Image-Convert-Apple-II-MacOSTests";
+			name = "Retro-Graphics-ConverterTests";
 			packageProductDependencies = (
 			);
 			productName = "SHR to PNG ConvertTests";
-			productReference = 3E9C9EA72EE37BE000DEE453 /* Image-Convert-Apple-II-MacOSTests.xctest */;
+			productReference = 3E9C9EA72EE37BE000DEE453 /* Retro-Graphics-ConverterTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		3E9C9EB02EE37BE000DEE453 /* Image-Convert-Apple-II-MacOSUITests */ = {
+		3E9C9EB02EE37BE000DEE453 /* Retro-Graphics-ConverterUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3E9C9EC12EE37BE000DEE453 /* Build configuration list for PBXNativeTarget "Image-Convert-Apple-II-MacOSUITests" */;
+			buildConfigurationList = 3E9C9EC12EE37BE000DEE453 /* Build configuration list for PBXNativeTarget "Retro-Graphics-ConverterUITests" */;
 			buildPhases = (
 				3E9C9EAD2EE37BE000DEE453 /* Sources */,
 				3E9C9EAE2EE37BE000DEE453 /* Frameworks */,
@@ -156,11 +156,11 @@
 			fileSystemSynchronizedGroups = (
 				3E9C9EB42EE37BE000DEE453 /* SHR to PNG ConvertUITests */,
 			);
-			name = "Image-Convert-Apple-II-MacOSUITests";
+			name = "Retro-Graphics-ConverterUITests";
 			packageProductDependencies = (
 			);
 			productName = "SHR to PNG ConvertUITests";
-			productReference = 3E9C9EB12EE37BE000DEE453 /* Image-Convert-Apple-II-MacOSUITests.xctest */;
+			productReference = 3E9C9EB12EE37BE000DEE453 /* Retro-Graphics-ConverterUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -186,7 +186,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 3E9C9E952EE37BDF00DEE453 /* Build configuration list for PBXProject "Image-Convert-Apple-II-MacOS" */;
+			buildConfigurationList = 3E9C9E952EE37BDF00DEE453 /* Build configuration list for PBXProject "Retro-Graphics-Converter" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -200,9 +200,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				3E9C9E992EE37BDF00DEE453 /* Image-Convert-Apple-II-MacOS */,
-				3E9C9EA62EE37BE000DEE453 /* Image-Convert-Apple-II-MacOSTests */,
-				3E9C9EB02EE37BE000DEE453 /* Image-Convert-Apple-II-MacOSUITests */,
+				3E9C9E992EE37BDF00DEE453 /* Retro-Graphics-Converter */,
+				3E9C9EA62EE37BE000DEE453 /* Retro-Graphics-ConverterTests */,
+				3E9C9EB02EE37BE000DEE453 /* Retro-Graphics-ConverterUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -258,12 +258,12 @@
 /* Begin PBXTargetDependency section */
 		3E9C9EA92EE37BE000DEE453 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 3E9C9E992EE37BDF00DEE453 /* Image-Convert-Apple-II-MacOS */;
+			target = 3E9C9E992EE37BDF00DEE453 /* Retro-Graphics-Converter */;
 			targetProxy = 3E9C9EA82EE37BE000DEE453 /* PBXContainerItemProxy */;
 		};
 		3E9C9EB32EE37BE000DEE453 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 3E9C9E992EE37BDF00DEE453 /* Image-Convert-Apple-II-MacOS */;
+			target = 3E9C9E992EE37BDF00DEE453 /* Retro-Graphics-Converter */;
 			targetProxy = 3E9C9EB22EE37BE000DEE453 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -403,7 +403,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.92;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "portwally.SHR-to-PNG-Convert";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -432,7 +432,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.92;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "portwally.SHR-to-PNG-Convert";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -461,7 +461,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Image-Convert-Apple-II-MacOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Image-Convert-Apple-II-MacOS";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Retro-Graphics-Converter.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Retro-Graphics-Converter";
 			};
 			name = Debug;
 		};
@@ -481,7 +481,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Image-Convert-Apple-II-MacOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Image-Convert-Apple-II-MacOS";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Retro-Graphics-Converter.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Retro-Graphics-Converter";
 			};
 			name = Release;
 		};
@@ -524,7 +524,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		3E9C9E952EE37BDF00DEE453 /* Build configuration list for PBXProject "Image-Convert-Apple-II-MacOS" */ = {
+		3E9C9E952EE37BDF00DEE453 /* Build configuration list for PBXProject "Retro-Graphics-Converter" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				3E9C9EB92EE37BE000DEE453 /* Debug */,
@@ -533,7 +533,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		3E9C9EBB2EE37BE000DEE453 /* Build configuration list for PBXNativeTarget "Image-Convert-Apple-II-MacOS" */ = {
+		3E9C9EBB2EE37BE000DEE453 /* Build configuration list for PBXNativeTarget "Retro-Graphics-Converter" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				3E9C9EBC2EE37BE000DEE453 /* Debug */,
@@ -542,7 +542,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		3E9C9EBE2EE37BE000DEE453 /* Build configuration list for PBXNativeTarget "Image-Convert-Apple-II-MacOSTests" */ = {
+		3E9C9EBE2EE37BE000DEE453 /* Build configuration list for PBXNativeTarget "Retro-Graphics-ConverterTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				3E9C9EBF2EE37BE000DEE453 /* Debug */,
@@ -551,7 +551,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		3E9C9EC12EE37BE000DEE453 /* Build configuration list for PBXNativeTarget "Image-Convert-Apple-II-MacOSUITests" */ = {
+		3E9C9EC12EE37BE000DEE453 /* Build configuration list for PBXNativeTarget "Retro-Graphics-ConverterUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				3E9C9EC22EE37BE000DEE453 /* Debug */,
