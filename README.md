@@ -3,32 +3,70 @@ In the end I decided to code one myself in Swift. It started with SHR uncompress
 Newly added are now HGR and DHGR conversion and output formats like png, jpg, tiff, gif and heic.
 Was bored and added then more graphic formats...
 
-🎨 Supported formats:
-<ul>
-<li>Apple II: SHR (Standard + 3200 Colour), HGR, DHGR</li>
-<li>Amiga: IFF/ILBM (Indexed Colour + 24-bit RGB with LSB-first)</li>
-<li>Atari ST: Degas PI1/PI2/PI3 (Low/Medium/High Res)</li>
-<li>C64: Koala Painter, Art Studio</li>
-<li>ZX Spectrum: SCR</li>  
-<li>Amstrad CPC: Mode 0 (160x200) + Mode 1 (320x200)</li>  
-<li>PCX: 1/2/4/8/24-bit mit RLE (inkl. CGA 2-bit!)</li>
-<li>BMP: (1/4/8/24-bit)</li>
-<li>MacPaint: (1-bit)</li>
-</ul>
-Features:
+📂 Supported Formats (10 Platforms)
+Retro Platforms
 
-📁 Image browser with thumbnails<br>
-🗂️ Folder support (drag & drop + open)<br>
-💾 Batch export (PNG, JPEG, TIFF, GIF, HEIC)<br>
-⚡ Recursive scanning of subfolders<br>
-🎯 Export single image or all images<br>
-🔍 Upscaling 2x/4x/8x <br>
-🎨 5 Export formats<br>
+🍎 Apple II/IIGS: SHR (Standard/3200), HGR, DHGR<br>
+🖥️ Amiga: IFF/ILBM (8-bit indexed, 24-bit RGB)<br>
+🕹️ Atari ST: Degas (PI1/PI2/PI3)<br>
+💾 Commodore 64: Koala Painter, HIRES, Art Studio<br>
+🎮 ZX Spectrum: SCR (6912 bytes)<br>
+💻 Amstrad CPC: Mode 0 (16 colors), Mode 1 (4 colors)<br>
+🖨️ PC/DOS: PCX (1/2/4/8/24-bit with RLE compression)<br>
+🪟 Windows: BMP (1/4/8/24-bit)<br>
+🖼️ Classic Mac: MacPaint (1-bit with PackBits compression)<br>
 
-NEW version 2 now with image browser
+Modern Formats
 
-<img width="1012" height="740" alt="Bildschirmfoto 2025-12-09 um 11 37 11" src="https://github.com/user-attachments/assets/e13ae4d8-4699-440c-9d6a-d15364f033c8" />
-<img width="1012" height="740" alt="Bildschirmfoto 2025-12-09 um 11 36 48" src="https://github.com/user-attachments/assets/7b858688-7503-4b00-96da-e598fc0af28a" />
+📸 PNG: Portable Network Graphics<br>
+🎞️ JPEG/JPG: Joint Photographic Experts Group<br>
+🎬 GIF: Graphics Interchange Format<br>
+📄 TIFF: Tagged Image File Format<br>
+📱 HEIC/HEIF: High Efficiency Image Format<br>
+🌐 WebP: Google's web format<br>
+
+✨ Features
+File Management
+
+📥 Drag & Drop: Drop files anywhere - main area or browser panel<br>
+📁 Folder Support: Recursively scan folders for image files<br>
+🔄 Batch Processing: Process hundreds of files at once<br>
+🗑️ Clear All: Quick clear button to reset workspace<br>
+
+Export & Conversion
+
+💾 Export Formats: PNG, JPEG, TIFF, GIF, HEIC<br>
+📈 Upscaling: 1x (original), 2x, 4x, 8x with nearest-neighbor (pixel-perfect)<br>
+📦 Batch Export: Export all images to chosen format<br>
+✏️ Custom Naming: Export with patterns like {name}_{n} or converted_{n}<br>
+🎨 Format Preservation: Maintains authentic retro look with proper color palettes<br>
+
+Smart Detection
+
+🧠 Intelligent Format Recognition: Magic bytes, file size, and extension analysis<br>
+🔬 Multi-Method Detection: Priority system prevents false positives<br>
+⚙️ Edge Case Handling: Supports variant file sizes (e.g., C64 Koala 10003-10010 bytes)<br>
+🎯 Conflict Resolution: DHGR vs CPC, MacPaint vs SHR detection logic<br>
+
+Technical Highlights
+
+🎨 Accurate Color Palettes: C64, Apple II, EGA, CGA, ZX Spectrum palettes<br>
+🗜️ Decompression Support: RLE (PCX), PackBits (MacPaint), IFF compression<br>
+🔄 Format-Specific Decoding: Planar, chunky, interleaved bitmap handling<br>
+📊 Resolution Accuracy: Proper aspect ratios and pixel layouts<br>
+
+🚀 Use Cases
+
+🕰️ Retro Gaming: Convert game graphics from classic platforms<br>
+🎨 Digital Preservation: Archive vintage computer art<br>
+🔄 Format Migration: Batch convert old formats to modern standards<br>
+📚 Collection Management: Browse and organize retro graphics libraries<br>
+🖼️ Comparison: View retro and modern images side-by-side<br>
+💿 Archive Processing: Extract and convert graphics from disk images<br>
+
+
+<img width="1492" height="831" alt="Bildschirmfoto 2025-12-10 um 14 49 07" src="https://github.com/user-attachments/assets/db620b3a-73e4-4c0c-988c-9c659bcfb75a" />
+
 
 Amiga images
 <img width="1149" height="746" alt="Bildschirmfoto 2025-12-09 um 14 45 48" src="https://github.com/user-attachments/assets/74ba32a7-689f-4859-be10-9a6abfdd7b81" />
