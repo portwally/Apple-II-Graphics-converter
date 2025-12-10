@@ -731,19 +731,10 @@ class SHRDecoder {
         }
         
         // Check for MacPaint format (.MAC, .PNTG)
-        // MacPaint: 512 byte header + compressed PackBits data (variable size, typically 20-100KB)
+        // Only check by extension first - size-based detection comes later
         if fileExtension == "mac" || fileExtension == "pntg" {
             if size >= 512 {
                 return decodeMacPaint(data: data)
-            }
-        }
-        
-        // Also try MacPaint for files in typical size range without extension
-        if size >= 20000 && size <= 100000 && size >= 512 {
-            // Try MacPaint detection - if it decodes successfully, it's MacPaint
-            let result = decodeMacPaint(data: data)
-            if result.image != nil {
-                return result
             }
         }
         
@@ -782,6 +773,17 @@ class SHRDecoder {
         default:
             type = .Unknown
             image = nil
+        }
+        
+        // Last resort: Try MacPaint for files in typical size range without extension
+        // This comes AFTER all known formats to avoid false positives
+        if image == nil && type == .Unknown {
+            if size >= 20000 && size <= 100000 && size >= 512 {
+                let result = decodeMacPaint(data: data)
+                if result.image != nil {
+                    return result
+                }
+            }
         }
         
         return (image, type)
