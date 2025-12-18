@@ -1,7 +1,16 @@
+![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)
+![Language](https://img.shields.io/badge/language-Swift%20%7C%20C-orange)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
 I was in search of a tool for MacOS that could batch convert Apple IIgs SHR graphics into png format but could not find anything.
 In the end I decided to code one myself in Swift. It started with SHR uncompressed graphic files to png format.
 Newly added are now HGR and DHGR conversion and output formats like png, jpg, tiff, gif and heic.
 Was bored and added then more graphic formats...
+
+**NEW, now with files browser for .2mg, .po and .hdv volumes**<br>
+Just drag and drop your disk images in the app and extract your pics from there. You also can export any file from within the app to your Mac.
+<img width="1414" height="912" alt="filebrowser" src="https://github.com/user-attachments/assets/1ad90ea1-316e-440a-9d98-abf9bc4357e9" />
+
 
 📂 Supported Formats (10 Platforms)
 Retro Platforms
@@ -109,5 +118,12 @@ Select Open from the context menu.
 In the subsequent dialog box, confirm that you want to open the app by clicking Open again.
 
 The application will now launch and will be trusted by macOS for all future starts.
+
+if this does not work then
+1. Open Terminal
+You can find it in:
+Applications → Utilities → Terminal
+2. Run the following command (in case you installed it in the Applications directory):<br>
+```xattr -cr /Applications/Retro-Graphics-Converter.app```
 
 
