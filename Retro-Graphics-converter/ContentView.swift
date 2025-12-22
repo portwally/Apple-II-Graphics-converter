@@ -1565,6 +1565,7 @@ struct ContentView: View {
     @State private var filesToConvert: [URL] = []
     @State private var imageItems: [ImageItem] = []
     @State private var selectedImage: ImageItem?
+    @State private var selectedImages: Set<UUID> = []  // For multi-selection in browser
     @State private var selectedExportFormat: ExportFormat = .png
     @State private var statusMessage: String = "Drag files/folders or open files to start."
     @State private var isProcessing = false
@@ -1572,7 +1573,6 @@ struct ContentView: View {
     @State private var showBrowser = false
     @State private var upscaleFactor: Int = 1
     @State private var zoomScale: CGFloat = 1.0
-    @State private var imageOffset: CGSize = .zero
     @State private var filterFormat: String = "All"
     @State private var showCatalogBrowser = false
     @State private var currentCatalog: DiskCatalog? = nil
@@ -1646,10 +1646,25 @@ struct ContentView: View {
                 Text("Image Browser")
                     .font(.headline)
                 Spacer()
-                Button(action: { clearAllImages() }) {
+                
+                // Select All button
+                Button(action: {
+                    if selectedImages.count == filteredImages.count {
+                        // Deselect all
+                        selectedImages.removeAll()
+                    } else {
+                        // Select all
+                        selectedImages = Set(filteredImages.map { $0.id })
+                    }
+                }) {
+                    Image(systemName: selectedImages.count == filteredImages.count ? "checkmark.square.fill" : "square")
+                }
+                .help(selectedImages.count == filteredImages.count ? "Deselect All" : "Select All")
+                
+                Button(action: { deleteSelectedImages() }) {
                     Image(systemName: "trash")
                 }
-                .help("Clear all images")
+                .help(selectedImages.isEmpty ? "Delete current image" : "Delete \(selectedImages.count) selected image(s)")
             }
             
             HStack {
@@ -1676,10 +1691,21 @@ struct ContentView: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)], spacing: 10) {
                     ForEach(filteredImages) { item in
-                        ImageThumbnailView(item: item, isSelected: selectedImage?.id == item.id)
-                            .onTapGesture {
+                        ImageThumbnailView(
+                            item: item,
+                            isSelected: selectedImage?.id == item.id,
+                            isChecked: selectedImages.contains(item.id),
+                            onSelect: {
                                 selectedImage = item
+                            },
+                            onToggleCheck: {
+                                if selectedImages.contains(item.id) {
+                                    selectedImages.remove(item.id)
+                                } else {
+                                    selectedImages.insert(item.id)
+                                }
                             }
+                        )
                     }
                 }
                 .padding(.horizontal, 5)
@@ -1690,12 +1716,6 @@ struct ContentView: View {
                 loadDroppedFiles(providers)
                 return true
             }
-            
-            Divider()
-            
-            Text("\(filteredImages.count) of \(imageItems.count) image(s)")
-                .font(.caption)
-                .foregroundColor(.secondary)
         }
         .padding()
         .background(Color(NSColor.controlBackgroundColor))
@@ -1703,6 +1723,71 @@ struct ContentView: View {
     
     var mainPanel: some View {
         VStack(spacing: 20) {
+            // New toolbar above image
+            if !imageItems.isEmpty && selectedImage != nil {
+                HStack {
+                    Spacer()
+                    
+                    // Image info and zoom controls
+                    if let selectedImg = selectedImage {
+                        HStack(spacing: 15) {
+                            // Image info
+                            HStack(spacing: 8) {
+                                Text(selectedImg.filename)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                Text("•")
+                                    .foregroundColor(.secondary)
+                                Text(selectedImg.type.displayName)
+                                    .font(.caption)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.blue.opacity(0.2))
+                                    .cornerRadius(4)
+                            }
+                            
+                            Divider()
+                                .frame(height: 20)
+                            
+                            // Zoom controls
+                            HStack(spacing: 8) {
+                                Button(action: {
+                                    zoomScale = max(0.5, zoomScale / 1.5)
+                                }) {
+                                    Image(systemName: "minus.magnifyingglass")
+                                }
+                                .help("Zoom Out")
+                                
+                                Text("\(Int(zoomScale * 100))%")
+                                    .font(.caption)
+                                    .monospacedDigit()
+                                    .frame(width: 50)
+                                
+                                Button(action: {
+                                    zoomScale = min(10.0, zoomScale * 1.5)
+                                }) {
+                                    Image(systemName: "plus.magnifyingglass")
+                                }
+                                .help("Zoom In")
+                                
+                                Button(action: {
+                                    zoomScale = 1.0
+                                }) {
+                                    Image(systemName: "arrow.counterclockwise")
+                                }
+                                .help("Reset Zoom")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color(NSColor.controlBackgroundColor))
+                .cornerRadius(8)
+            }
+            
+            // Image display area
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(style: StrokeStyle(lineWidth: 2, dash: [10]))
@@ -1710,58 +1795,25 @@ struct ContentView: View {
                     .background(Color(NSColor.controlBackgroundColor))
                 
                 if let selectedImg = selectedImage {
-                    VStack(spacing: 10) {
-                        GeometryReader { geometry in
-                            ScrollView([.horizontal, .vertical], showsIndicators: true) {
-                                Image(nsImage: selectedImg.image)
-                                    .interpolation(.none)
-                                    .scaleEffect(zoomScale)
-                                    .offset(imageOffset)
-                                    .gesture(
-                                        MagnificationGesture()
-                                            .onChanged { value in
-                                                zoomScale = max(0.5, min(value, 10.0))
-                                            }
-                                    )
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: 400)
+                    GeometryReader { geometry in
+                        ScrollView([.horizontal, .vertical], showsIndicators: true) {
+                            Image(nsImage: selectedImg.image)
+                                .resizable()
+                                .interpolation(.none)
+                                .frame(
+                                    width: CGFloat(selectedImg.image.size.width) * zoomScale,
+                                    height: CGFloat(selectedImg.image.size.height) * zoomScale
+                                )
+                                .gesture(
+                                    MagnificationGesture()
+                                        .onChanged { value in
+                                            zoomScale = max(0.5, min(value, 10.0))
+                                        }
+                                )
                         }
-                        .frame(maxHeight: 400)
-                        
-                        HStack(spacing: 10) {
-                            Button("Zoom Out") {
-                                zoomScale = max(0.5, zoomScale / 1.5)
-                            }
-                            
-                            Text("\(Int(zoomScale * 100))%")
-                                .frame(width: 60)
-                            
-                            Button("Zoom In") {
-                                zoomScale = min(10.0, zoomScale * 1.5)
-                            }
-                            
-                            Button("Reset") {
-                                zoomScale = 1.0
-                                imageOffset = .zero
-                            }
-                            
-                            Spacer()
-                        }
-                        .font(.caption)
-                        
-                        HStack {
-                            Text(selectedImg.filename)
-                                .font(.headline)
-                            Spacer()
-                            Text(selectedImg.type.displayName)
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.blue.opacity(0.2))
-                                .cornerRadius(4)
-                        }
-                        .padding(.horizontal)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
+                    .frame(height: 450)
                     .padding()
                 } else if imageItems.isEmpty {
                     VStack(spacing: 15) {
@@ -1811,6 +1863,7 @@ struct ContentView: View {
             }
             
             VStack(spacing: 10) {
+                // First row: File operations and format selection
                 HStack {
                     Button("Open Files...") {
                         openFiles()
@@ -1839,8 +1892,16 @@ struct ContentView: View {
                         }
                     }
                     .frame(width: 180)
+                }
+                
+                // Second row: Export buttons
+                HStack(spacing: 10) {
+                    Button("Export Selected (\(selectedImages.isEmpty ? 1 : selectedImages.count))...") {
+                        exportSelectedImages()
+                    }
+                    .disabled((selectedImage == nil && selectedImages.isEmpty) || isProcessing)
                     
-                    Button("Export All to \(selectedExportFormat.rawValue)...") {
+                    Button("Export All (\(imageItems.count))...") {
                         exportAllImages()
                     }
                     .disabled(imageItems.isEmpty || isProcessing)
@@ -1849,16 +1910,8 @@ struct ContentView: View {
                         showBatchRename()
                     }
                     .disabled(imageItems.isEmpty || isProcessing)
-                }
-                
-                if let selected = selectedImage {
-                    HStack {
-                        Spacer()
-                        Button("Export Selected Image...") {
-                            exportSingleImage(selected)
-                        }
-                        .disabled(isProcessing)
-                    }
+                    
+                    Spacer()
                 }
             }
             
@@ -1907,10 +1960,47 @@ struct ContentView: View {
     func clearAllImages() {
         imageItems = []
         selectedImage = nil
+        selectedImages.removeAll()
         filesToConvert = []
         statusMessage = "All images cleared."
         progressString = ""
         showBrowser = false
+    }
+    
+    func deleteSelectedImages() {
+        if selectedImages.isEmpty {
+            // No selection - delete current image
+            if let current = selectedImage {
+                imageItems.removeAll { $0.id == current.id }
+                
+                // Select next image if available
+                if !imageItems.isEmpty {
+                    selectedImage = imageItems.first
+                } else {
+                    selectedImage = nil
+                    showBrowser = false
+                }
+                
+                statusMessage = "Image deleted."
+            }
+        } else {
+            // Delete all selected images
+            let count = selectedImages.count
+            imageItems.removeAll { selectedImages.contains($0.id) }
+            selectedImages.removeAll()
+            
+            // Update selected image if it was deleted
+            if let current = selectedImage, !imageItems.contains(where: { $0.id == current.id }) {
+                selectedImage = imageItems.first
+            }
+            
+            if imageItems.isEmpty {
+                selectedImage = nil
+                showBrowser = false
+            }
+            
+            statusMessage = "Deleted \(count) image(s)."
+        }
     }
     
     func showBatchRename() {
@@ -2307,6 +2397,63 @@ struct ContentView: View {
         }
     }
     
+    func exportSelectedImages() {
+        // Determine which images to export
+        var itemsToExport: [ImageItem] = []
+        
+        if !selectedImages.isEmpty {
+            // Export all checked images
+            itemsToExport = imageItems.filter { selectedImages.contains($0.id) }
+        } else if let current = selectedImage {
+            // No checked images - export current image only
+            itemsToExport = [current]
+        }
+        
+        guard !itemsToExport.isEmpty else { return }
+        
+        if itemsToExport.count == 1 {
+            // Single image - use save panel
+            exportSingleImage(itemsToExport[0])
+        } else {
+            // Multiple images - choose folder
+            let openPanel = NSOpenPanel()
+            openPanel.canChooseFiles = false
+            openPanel.canChooseDirectories = true
+            openPanel.allowsMultipleSelection = false
+            openPanel.canCreateDirectories = true
+            openPanel.showsHiddenFiles = false
+            openPanel.prompt = "Select Export Folder"
+            openPanel.message = "Export \(itemsToExport.count) selected images as \(selectedExportFormat.rawValue)"
+            
+            if openPanel.runModal() == .OK, let outputFolderURL = openPanel.url {
+                isProcessing = true
+                
+                DispatchQueue.global(qos: .userInitiated).async {
+                    var successCount = 0
+                    
+                    for (index, item) in itemsToExport.enumerated() {
+                        DispatchQueue.main.async {
+                            self.progressString = "Exporting \(index + 1) of \(itemsToExport.count)"
+                        }
+                        
+                        let filename = "\(item.url.deletingPathExtension().lastPathComponent).\(self.selectedExportFormat.fileExtension)"
+                        let outputURL = outputFolderURL.appendingPathComponent(filename)
+                        
+                        if self.saveImage(image: item.image, to: outputURL, format: self.selectedExportFormat) {
+                            successCount += 1
+                        }
+                    }
+                    
+                    DispatchQueue.main.async {
+                        self.isProcessing = false
+                        self.statusMessage = "Exported \(successCount) of \(itemsToExport.count) selected image(s)"
+                        self.progressString = ""
+                    }
+                }
+            }
+        }
+    }
+    
     func exportAllImages() {
         let openPanel = NSOpenPanel()
         openPanel.canChooseFiles = false
@@ -2391,19 +2538,43 @@ struct ContentView: View {
 struct ImageThumbnailView: View {
     let item: ImageItem
     let isSelected: Bool
+    let isChecked: Bool
+    let onSelect: () -> Void
+    let onToggleCheck: () -> Void
     
     var body: some View {
         VStack(spacing: 4) {
-            Image(nsImage: item.image)
-                .resizable()
-                .interpolation(.none)
-                .frame(width: 120, height: 90)
-                .background(Color.black.opacity(0.1))
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 3)
-                )
+            ZStack(alignment: .topLeading) {
+                Image(nsImage: item.image)
+                    .resizable()
+                    .interpolation(.none)
+                    .frame(width: 120, height: 90)
+                    .background(Color.black.opacity(0.1))
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 3)
+                    )
+                    .onTapGesture {
+                        onSelect()
+                    }
+                
+                // Checkbox overlay
+                Button(action: {
+                    onToggleCheck()
+                }) {
+                    Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
+                        .font(.title2)
+                        .foregroundColor(isChecked ? .blue : .white)
+                        .background(
+                            Circle()
+                                .fill(isChecked ? Color.white : Color.black.opacity(0.3))
+                                .frame(width: 22, height: 22)
+                        )
+                }
+                .buttonStyle(.plain)
+                .padding(6)
+            }
             
             Text(item.filename)
                 .font(.caption2)
