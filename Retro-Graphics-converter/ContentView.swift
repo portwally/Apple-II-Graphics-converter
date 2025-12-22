@@ -5,6 +5,38 @@ import CoreGraphics
 import ImageIO
 import AppKit
 
+// MARK: - Custom UTType Extensions for Retro Image Formats
+
+extension UTType {
+    static var pcx: UTType {
+        UTType(filenameExtension: "pcx") ?? .data
+    }
+    
+    static var shr: UTType {
+        UTType(filenameExtension: "shr") ?? .data
+    }
+    
+    static var pic: UTType {
+        UTType(filenameExtension: "pic") ?? .data
+    }
+    
+    static var pnt: UTType {
+        UTType(filenameExtension: "pnt") ?? .data
+    }
+    
+    static var twoimg: UTType {
+        UTType(filenameExtension: "2img") ?? .data
+    }
+    
+    static var dsk: UTType {
+        UTType(filenameExtension: "dsk") ?? .data
+    }
+    
+    static var hdv: UTType {
+        UTType(filenameExtension: "hdv") ?? .data
+    }
+}
+
 // MARK: - Export Format Enum
 
 enum ExportFormat: String, CaseIterable {
@@ -1652,7 +1684,8 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 5)
             }
-            .onDrop(of: [.fileURL, .url, .data], isTargeted: nil) { providers in
+            .onDrop(of: [.fileURL, .url, .data, .png, .jpeg, .gif, .bmp, .tiff,
+                         .pcx, .shr, .pic, .pnt, .twoimg, .dsk, .hdv], isTargeted: nil) { providers in
               
                 loadDroppedFiles(providers)
                 return true
@@ -1770,7 +1803,8 @@ struct ContentView: View {
                 }
             }
             .frame(height: 450)
-            .onDrop(of: [.fileURL, .url, .data], isTargeted: nil) { providers in
+            .onDrop(of: [.fileURL, .url, .data, .png, .jpeg, .gif, .bmp, .tiff,
+                         .pcx, .shr, .pic, .pnt, .twoimg, .dsk, .hdv], isTargeted: nil) { providers in
          
                 loadDroppedFiles(providers)
                 return true
@@ -1952,6 +1986,14 @@ struct ContentView: View {
         openPanel.canChooseDirectories = true
         openPanel.canChooseFiles = true
         openPanel.prompt = "Open Files or Folders"
+        
+        // Explicitly allow PCX and other retro image formats
+        openPanel.allowedContentTypes = [
+            .png, .jpeg, .gif, .bmp, .tiff,
+            .pcx, .shr, .pic, .pnt,
+            .twoimg, .dsk, .hdv,
+            .data  // Allow all data types as fallback
+        ]
 
         if openPanel.runModal() == .OK {
             processFilesAndFolders(urls: openPanel.urls)
